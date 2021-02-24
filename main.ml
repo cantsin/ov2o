@@ -17,14 +17,23 @@ let traverse dir predicate =
 
 let debug cal = Format.asprintf "%a" Icalendar.pp cal
 
-let get_start (event: Icalendar.event): Ptime.t =
-  match snd event.dtstart with
+let get_datetime = function
     `Date d -> Ptime.of_date d |> Option.value ~default:Ptime.min
   | `Datetime ts ->
      match ts with
        `With_tzid (t, _) -> t (* TODO: adjust for timezone *)
      | `Utc u -> u
      | `Local l -> l
+
+let get_start (event: Icalendar.event): Ptime.t =
+  snd event.dtstart |> get_datetime
+
+let get_end (event: Icalendar.event): Ptime.t =
+  match event.dtend_or_duration with
+    None -> Ptime.min
+  | Some time -> match time with
+                   `Dtend ts -> snd ts |> get_datetime
+                 | `Duration _ -> Ptime.min (* TODO: support this use case *)
 
 let get_description (event: Icalendar.event): string =
   let x = List.find_map event.props ~f:(function `Summary s -> Some (snd s) | _ -> None)
@@ -39,7 +48,7 @@ let extract filename =
   |> List.filter_map ~f:(function `Event e -> Some e | _ -> None)
   |> List.map ~f:(function (event: Icalendar.event) ->
                     (get_start event,
-                     event.dtend_or_duration,
+                     get_end event,
                      get_description event))
 
 (* - VEVENT/SUMMARY
