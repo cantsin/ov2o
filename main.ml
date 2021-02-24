@@ -17,13 +17,23 @@ let traverse dir predicate =
 
 let debug cal = Format.asprintf "%a" Icalendar.pp cal
 
+(* let to_ptime (value: Icalendar.params * Icalendar.date_or_datetime): Ptime.t =
+ *   () *)
+
+let get_description (event: Icalendar.event): string =
+  List.find_map event.props ~f:(function `Summary s -> Some (snd s) | _ -> None)
+  |> Option.value ~default:"(No summary)"
+
 let extract filename =
   Core.In_channel.read_all filename
   |> Icalendar.parse
   |> Result.ok_or_failwith
   |> snd
   |> List.filter_map ~f:(function `Event e -> Some e | _ -> None)
-  |> List.map ~f:(function (event: Icalendar.event) -> (event.dtstart, event.dtend_or_duration, event.props))
+  |> List.map ~f:(function (event: Icalendar.event) ->
+                    (event.dtstart,
+                     event.dtend_or_duration,
+                     get_description event))
 
 (* - VEVENT/SUMMARY
  * - VEVENT/DTSTART and VEVENT/DTEND (depending on timezone)
