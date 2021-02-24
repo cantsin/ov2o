@@ -35,10 +35,13 @@ let get_end (event: Icalendar.event): Ptime.t =
                    `Dtend ts -> snd ts |> get_datetime
                  | `Duration _ -> Ptime.min (* TODO: support this use case *)
 
+let get_summary (event: Icalendar.event): string =
+  List.find_map event.props ~f:(function `Summary s -> Some (snd s) | _ -> None)
+  |> Option.value ~default:"(No summary)"
+
 let get_description (event: Icalendar.event): string =
-  let x = List.find_map event.props ~f:(function `Summary s -> Some (snd s) | _ -> None)
-  |> Option.value ~default:"(No summary)" in
-  let () = Printf.printf "%s" x in x
+  List.find_map event.props ~f:(function `Description d -> Some (snd d) | _ -> None)
+  |> Option.value ~default:"(No description)"
 
 let extract filename =
   Core.In_channel.read_all filename
@@ -46,25 +49,24 @@ let extract filename =
   |> Result.ok_or_failwith
   |> snd
   |> List.filter_map ~f:(function `Event e -> Some e | _ -> None)
-  |> List.map ~f:(function (event: Icalendar.event) ->
-                    (get_start event,
-                     get_end event,
-                     get_description event))
 
-(* - VEVENT/SUMMARY
- * - VEVENT/DTSTART and VEVENT/DTEND (depending on timezone)
- *   in <org-date>--<org date> format
- * - VEVENT/DESCRIPTION *)
-(* let output event =
- *   () *)
+let to_org event =
+  Printf.printf "* %s\n<%s>--<%s>\n%s\n"
+    (get_summary event)
+    (get_start event |> Ptime.to_rfc3339) (* TODO: 2021-02-26 Fri 16:00 format *)
+    (get_end event |> Ptime.to_rfc3339) (* TODO: 2021-02-26 Fri 16:00 format *)
+    (get_description event)
 
 let discover path _ _ =
-  let (_: 'a list) = traverse path is_vcf
-          |> List.map ~f:extract
-          |> List.fold ~init:[] ~f:List.append in
-  (* filter date range: +/- 7 days *)
-  Printf.printf "done"
-;;
+  let behind = Ptime.min in (* TODO *)
+  let after = Ptime.max in (* TODO *)
+  traverse path is_vcf
+  |> List.map ~f:extract
+  |> List.fold ~init:[] ~f:List.append (* flatten *)
+  |> List.filter ~f:(function event ->
+                       let t = get_start event in
+                       Ptime.is_later t ~than:behind && Ptime.is_earlier t ~than:after)
+  |> List.iter ~f:to_org
 
 let command =
   Command.basic
