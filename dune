@@ -1,3 +1,4 @@
 (executable
  (libraries core icalendar)
- (name main))
+ (name main)
+ (preprocess (pps ppx_jane)))
