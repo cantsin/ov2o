@@ -13,8 +13,14 @@ let traverse dir predicate =
   in
   loop [] [ dir ]
 
+let of_ptime ?default:(v = Ptime.min) = function
+  | Some t -> t
+  | None ->
+      let () = Printf.printf "warning: invalid time option\n" in
+      v
+
 let get_datetime = function
-  | `Date d -> Ptime.of_date d |> Option.value ~default:Ptime.min
+  | `Date d -> Ptime.of_date d |> of_ptime
   | `Datetime ts -> (
       match ts with
       | `With_tzid (t, _) -> t (* TODO: adjust for timezone *)
@@ -30,9 +36,8 @@ let get_end (event : Icalendar.event) : Ptime.t =
   | Some time -> (
       match time with
       | `Dtend ts -> snd ts |> get_datetime
-      | `Duration (_, span) ->
-          Ptime.add_span (get_start event) span
-          |> Option.value ~default:Ptime.min)
+      | `Duration (_, span) -> Ptime.add_span (get_start event) span |> of_ptime
+      )
 
 let get_summary (event : Icalendar.event) : string =
   List.find_map event.props ~f:(function
@@ -86,13 +91,9 @@ let now () =
 
 let discover path days_behind days_after =
   let today = now () in
-  let behind =
-    day_span days_behind |> Ptime.sub_span today
-    |> Option.value ~default:Ptime.min
-  in
+  let behind = day_span days_behind |> Ptime.sub_span today |> of_ptime in
   let after =
-    day_span days_after |> Ptime.add_span today
-    |> Option.value ~default:Ptime.max
+    day_span days_after |> Ptime.add_span today |> of_ptime ~default:Ptime.max
   in
   traverse path is_vcf |> List.map ~f:extract
   |> List.fold ~init:[] ~f:List.append (* flatten *)
