@@ -13,8 +13,6 @@ let traverse dir predicate =
   in
   loop [] [ dir ]
 
-let debug cal = Format.asprintf "%a" Icalendar.pp cal
-
 let get_datetime = function
   | `Date d -> Ptime.of_date d |> Option.value ~default:Ptime.min
   | `Datetime ts -> (
@@ -32,7 +30,9 @@ let get_end (event : Icalendar.event) : Ptime.t =
   | Some time -> (
       match time with
       | `Dtend ts -> snd ts |> get_datetime
-      | `Duration _ -> (* TODO: support this use case *) Ptime.min)
+      | `Duration (_, span) ->
+          Ptime.add_span (get_start event) span
+          |> Option.value ~default:Ptime.min)
 
 let get_summary (event : Icalendar.event) : string =
   List.find_map event.props ~f:(function
@@ -51,21 +51,52 @@ let extract filename =
   |> Icalendar.parse |> Result.ok_or_failwith |> snd
   |> List.filter_map ~f:(function `Event e -> Some e | _ -> None)
 
-let to_org event =
-  Printf.printf "* %s\n<%s>--<%s>\n%s\n" (get_summary event)
-    (get_start event |> Ptime.to_rfc3339)
-    (* TODO: 2021-02-26 Fri 16:00 format *)
-    (get_end event |> Ptime.to_rfc3339)
-    (* TODO: 2021-02-26 Fri 16:00 format *)
-    (get_description event)
+let to_org_datetime p =
+  let (y, m, d), ((hh, mm, _), _) = Ptime.to_date_time p in
+  let weekday =
+    match Ptime.weekday p with
+    | `Sun -> "Sun"
+    | `Mon -> "Mon"
+    | `Tue -> "Tue"
+    | `Wed -> "Wed"
+    | `Thu -> "Thu"
+    | `Fri -> "Fri"
+    | `Sat -> "Sat"
+  in
+  Printf.sprintf "%.4d-%.2d-%.2d %s %.2d:%.2d" y m d weekday hh mm
 
-let discover path _ _ =
-  let behind = Ptime.min in
-  (* TODO *)
-  let after = Ptime.max in
-  (* TODO *)
+let to_org event =
+  Printf.printf "* %s\n  - %s\n  - <%s>--<%s>\n" (get_summary event)
+    (get_description event)
+    (get_start event |> to_org_datetime)
+    (get_end event |> to_org_datetime)
+
+let day_span days =
+  match Ptime.Span.of_d_ps (days, 0L) with
+  | Some s -> s
+  | None -> failwith "invalid day span"
+
+let now () =
+  let t = Date.today ~zone:Time.Zone.utc in
+  match
+    Ptime.of_date (Date.year t, Date.month t |> Month.to_int, Date.day t)
+  with
+  | Some t -> t
+  | None -> failwith "now"
+
+let discover path days_behind days_after =
+  let today = now () in
+  let behind =
+    day_span days_behind |> Ptime.sub_span today
+    |> Option.value ~default:Ptime.min
+  in
+  let after =
+    day_span days_after |> Ptime.add_span today
+    |> Option.value ~default:Ptime.max
+  in
   traverse path is_vcf |> List.map ~f:extract
   |> List.fold ~init:[] ~f:List.append (* flatten *)
+  (* TODO: sort by date? *)
   |> List.filter ~f:(function event ->
          let t = get_start event in
          Ptime.is_later t ~than:behind && Ptime.is_earlier t ~than:after)
@@ -80,3 +111,7 @@ let command =
       fun () -> discover path days_behind days_after)
 
 let () = Command.run ~version:"1.0" command
+
+(* TODO: test duration *)
+(* TODO: test timezones *)
+(* TODO: recurrences? *)
