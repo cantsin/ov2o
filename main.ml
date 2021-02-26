@@ -1,14 +1,18 @@
 open Core
 
 let local_tz = Time.Zone.local |> Lazy.force
-let local_tz_offset = Time.utc_offset Time.epoch ~zone:local_tz |> Time.Span.to_sec
+
+let tz_offset_in_seconds tz =
+  Time.utc_offset Time.epoch ~zone:tz |> Time.Span.to_sec
+
+let local_tz_offset = tz_offset_in_seconds local_tz
 
 let offset_tz tz =
-  let tz_offset = Time.utc_offset Time.epoch ~zone:tz |> Time.Span.to_sec in
+  let tz_offset = tz_offset_in_seconds tz in
   match Time.Zone.compare local_tz tz with
-    | 0 -> 0
-    | 1 -> local_tz_offset -. tz_offset |> int_of_float
-    | _ -> tz_offset -. local_tz_offset |> int_of_float
+  | 0 -> 0
+  | 1 -> local_tz_offset -. tz_offset |> int_of_float
+  | _ -> tz_offset -. local_tz_offset |> int_of_float
 
 let is_vcf filename = Filename.check_suffix filename ".vcf"
 
@@ -34,8 +38,10 @@ let get_datetime = function
   | `Datetime ts -> (
       match ts with
       | `With_tzid (t, (_, z)) ->
-         let offset = Time.Zone.find_exn z |> offset_tz |> Ptime.Span.of_int_s in
-         Ptime.add_span t offset |> Option.value ~default:t
+          let offset =
+            Time.Zone.find_exn z |> offset_tz |> Ptime.Span.of_int_s
+          in
+          Ptime.add_span t offset |> Option.value ~default:t
       | `Utc u -> u
       | `Local l -> l)
 
@@ -109,10 +115,11 @@ let discover path days_behind days_after =
   in
   traverse path is_vcf |> List.map ~f:extract
   |> List.fold ~init:[] ~f:List.append (* flatten *)
-  (* TODO: sort by date? *)
-  |> List.filter ~f:(function event ->
+  |> List.filter ~f:(fun event ->
          let t = get_start event in
          Ptime.is_later t ~than:behind && Ptime.is_earlier t ~than:after)
+  |> List.stable_sort ~compare:(fun event1 event2 ->
+         Ptime.compare (get_start event1) (get_start event2))
   |> List.iter ~f:to_org
 
 let command =
@@ -126,5 +133,4 @@ let command =
 let () = Command.run ~version:"1.0" command
 
 (* TODO: test duration *)
-(* TODO: test timezones *)
 (* TODO: recurrences? *)
