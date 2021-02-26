@@ -1,5 +1,15 @@
 open Core
 
+let local_tz = Time.Zone.local |> Lazy.force
+let local_tz_offset = Time.utc_offset Time.epoch ~zone:local_tz |> Time.Span.to_sec
+
+let offset_tz tz =
+  let tz_offset = Time.utc_offset Time.epoch ~zone:tz |> Time.Span.to_sec in
+  match Time.Zone.compare local_tz tz with
+    | 0 -> 0
+    | 1 -> local_tz_offset -. tz_offset |> int_of_float
+    | _ -> tz_offset -. local_tz_offset |> int_of_float
+
 let is_vcf filename = Filename.check_suffix filename ".vcf"
 
 let traverse dir predicate =
@@ -23,7 +33,9 @@ let get_datetime = function
   | `Date d -> Ptime.of_date d |> of_ptime
   | `Datetime ts -> (
       match ts with
-      | `With_tzid (t, _) -> t (* TODO: adjust for timezone *)
+      | `With_tzid (t, (_, z)) ->
+         let offset = Time.Zone.find_exn z |> offset_tz |> Ptime.Span.of_int_s in
+         Ptime.add_span t offset |> Option.value ~default:t
       | `Utc u -> u
       | `Local l -> l)
 
