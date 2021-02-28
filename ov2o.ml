@@ -19,9 +19,9 @@ let is_vcf filename = Filename.check_suffix filename ".vcf"
 let traverse dir predicate =
   let rec loop result = function
     | f :: fs when phys_equal (Sys.is_directory f) `Yes ->
-        Sys.ls_dir f
-        |> List.map ~f:(Filename.concat f)
-        |> List.append fs |> loop result
+      Sys.ls_dir f
+      |> List.map ~f:(Filename.concat f)
+      |> List.append fs |> loop result
     | f :: fs -> loop (if predicate f then f :: result else result) fs
     | [] -> result
   in
@@ -30,18 +30,18 @@ let traverse dir predicate =
 let of_ptime ?default:(v = Ptime.min) = function
   | Some t -> t
   | None ->
-      let () = Printf.printf "warning: invalid time option\n" in
-      v
+    let () = Printf.printf "warning: invalid time option\n" in
+    v
 
 let get_datetime = function
   | `Date d -> Ptime.of_date d |> of_ptime
   | `Datetime ts -> (
       match ts with
       | `With_tzid (t, (_, z)) ->
-          let offset =
-            Time.Zone.find_exn z |> offset_tz |> Ptime.Span.of_int_s
-          in
-          Ptime.add_span t offset |> Option.value ~default:t
+        let offset =
+          Time.Zone.find_exn z |> offset_tz |> Ptime.Span.of_int_s
+        in
+        Ptime.add_span t offset |> Option.value ~default:t
       | `Utc u -> u
       | `Local l -> l)
 
@@ -55,18 +55,18 @@ let get_end (event : Icalendar.event) : Ptime.t =
       match time with
       | `Dtend ts -> snd ts |> get_datetime
       | `Duration (_, span) -> Ptime.add_span (get_start event) span |> of_ptime
-      )
+    )
 
 let get_summary (event : Icalendar.event) : string =
   List.find_map event.props ~f:(function
-    | `Summary s -> Some (snd s)
-    | _ -> None)
+      | `Summary s -> Some (snd s)
+      | _ -> None)
   |> Option.value ~default:"(No summary)"
 
 let get_description (event : Icalendar.event) : string =
   List.find_map event.props ~f:(function
-    | `Description d -> Some (snd d)
-    | _ -> None)
+      | `Description d -> Some (snd d)
+      | _ -> None)
   |> Option.value ~default:"(No description)"
 
 let extract filename =
@@ -115,12 +115,30 @@ let discover path days_behind days_after =
   in
   traverse path is_vcf |> List.map ~f:extract
   |> List.fold ~init:[] ~f:List.append (* flatten *)
+  |> List.fold ~init:[] ~f:(fun accum event ->
+      let f = Icalendar.recur_events event in
+      let ongoing = ref true in
+      let addl = ref [] in
+      let () = while !ongoing do
+          match f () with
+          | None -> ongoing := false
+          | Some e ->
+            let () = Printf.printf "added recurrence %s\n" (e.uid |> snd) in
+            let () = Printf.printf "added ts %s\n" ([%show: Icalendar.timestamp_utc] (e.dtstamp |> snd)) in
+            addl := List.cons e !addl done in
+      List.cons event !addl |> List.append accum
+    )
+  |> List.filter ~f:(fun event ->
+      let () = match event.rrule with
+        | None -> ()
+        | Some(_, r) -> Printf.printf "%s\n" ([%show: Icalendar.recurrence] r) in
+      true)
   (* TODO apply recurrences *)
   |> List.filter ~f:(fun event ->
-         let t = get_start event in
-         Ptime.is_later t ~than:behind && Ptime.is_earlier t ~than:after)
+      let t = get_start event in
+      Ptime.is_later t ~than:behind && Ptime.is_earlier t ~than:after)
   |> List.stable_sort ~compare:(fun event1 event2 ->
-         Ptime.compare (get_start event1) (get_start event2))
+      Ptime.compare (get_start event1) (get_start event2))
   |> List.iter ~f:to_org
 
 let command =
@@ -134,3 +152,4 @@ let command =
 let () = Command.run ~version:"1.0" command
 
 (* TODO: test duration *)
+(* TODO: install https://github.com/Khady/merlin-eldoc/*)

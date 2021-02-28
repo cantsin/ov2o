@@ -1,4 +1,4 @@
 (executable
  (libraries core icalendar)
  (name ov2o)
- (preprocess (pps ppx_jane)))
+ (preprocess (pps ppx_deriving.std ppx_jane)))
