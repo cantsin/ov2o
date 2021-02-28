@@ -1,0 +1,8 @@
+bin: [
+  "_build/default/ov2o.exe"
+]
+lib: [
+  "_build/install/default/lib/ov2o/META"
+  "_build/install/default/lib/ov2o/dune-package"
+  "_build/install/default/lib/ov2o/opam"
+]

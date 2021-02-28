@@ -11,8 +11,8 @@ let offset_tz tz =
   let tz_offset = tz_offset_in_seconds tz in
   match Time.Zone.compare local_tz tz with
   | 0 -> 0
-  | 1 -> local_tz_offset -. tz_offset |> int_of_float
-  | _ -> tz_offset -. local_tz_offset |> int_of_float
+  | 1 -> tz_offset -. local_tz_offset |> int_of_float
+  | _ -> local_tz_offset -. tz_offset |> int_of_float
 
 let is_vcf filename = Filename.check_suffix filename ".vcf"
 
@@ -115,6 +115,7 @@ let discover path days_behind days_after =
   in
   traverse path is_vcf |> List.map ~f:extract
   |> List.fold ~init:[] ~f:List.append (* flatten *)
+  (* TODO apply recurrences *)
   |> List.filter ~f:(fun event ->
          let t = get_start event in
          Ptime.is_later t ~than:behind && Ptime.is_earlier t ~than:after)
@@ -133,4 +134,3 @@ let command =
 let () = Command.run ~version:"1.0" command
 
 (* TODO: test duration *)
-(* TODO: recurrences? *)

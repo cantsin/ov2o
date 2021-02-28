@@ -6,7 +6,8 @@ stdenv.mkDerivation {
     export UTOP_SITE_LISP=1
     export MERLIN_SITE_LISP=1
     export OCP_INDENT_SITE_LISP=1
+    eval $(opam env)
   '';
 }
-# opam install -y merlin ocamlformat core icalendar
-# eval $(opam env)
+# opam install -y merlin ocp-indent utop
+# opam install -y core icalendar

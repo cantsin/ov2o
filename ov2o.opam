@@ -1,0 +1,18 @@
+opam-version: "2.0"
+name: "ov2o"
+version: "1.0.0"
+synopsis: "Summarize iCalendar files into Org format"
+maintainer: "James Tranovich <jtranovich@gmail.com>"
+authors: "James Tranovich <jtranovich@gmail.com>"
+license: "MIT"
+homepage: ""
+bug-reports: ""
+depends: [
+  "core" {>= "v0.14.1"}
+  "icalendar" {>= "0.1.4"}
+]
+build: ["dune" "build"]
+dev-repo: "git+https://"
+url {
+  src: "git+file:///home/james/ov2o#main"
+}
