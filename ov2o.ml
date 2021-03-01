@@ -27,21 +27,15 @@ let traverse dir predicate =
   in
   loop [] [ dir ]
 
-let of_ptime ?default:(v = Ptime.min) = function
-  | Some t -> t
-  | None ->
-    let () = Printf.printf "warning: invalid time option\n" in
-    v
-
 let get_datetime = function
-  | `Date d -> Ptime.of_date d |> of_ptime
+  | `Date d -> Ptime.of_date d |> Option.value_exn
   | `Datetime ts -> (
       match ts with
       | `With_tzid (t, (_, z)) ->
         let offset =
           Time.Zone.find_exn z |> offset_tz |> Ptime.Span.of_int_s
         in
-        Ptime.add_span t offset |> Option.value ~default:t
+        Ptime.add_span t offset |> Option.value_exn
       | `Utc u -> u
       | `Local l -> l)
 
@@ -54,7 +48,7 @@ let get_end (event : Icalendar.event) : Ptime.t =
   | Some time -> (
       match time with
       | `Dtend ts -> snd ts |> get_datetime
-      | `Duration (_, span) -> Ptime.add_span (get_start event) span |> of_ptime
+      | `Duration (_, span) -> Ptime.add_span (get_start event) span |> Option.value_exn
     )
 
 let get_summary (event : Icalendar.event) : string =
@@ -94,24 +88,17 @@ let to_org event =
     (get_start event |> to_org_datetime)
     (get_end event |> to_org_datetime)
 
-let day_span days =
-  match Ptime.Span.of_d_ps (days, 0L) with
-  | Some s -> s
-  | None -> failwith "invalid day span"
+let day_span days = Ptime.Span.of_d_ps (days, 0L) |> Option.value_exn
 
 let now () =
   let t = Date.today ~zone:Time.Zone.utc in
-  match
-    Ptime.of_date (Date.year t, Date.month t |> Month.to_int, Date.day t)
-  with
-  | Some t -> t
-  | None -> failwith "now"
+  Ptime.of_date (Date.year t, Date.month t |> Month.to_int, Date.day t) |> Option.value_exn
 
 let discover path days_behind days_after =
   let today = now () in
-  let behind = day_span days_behind |> Ptime.sub_span today |> of_ptime in
+  let behind = day_span days_behind |> Ptime.sub_span today |> Option.value_exn in
   let after =
-    day_span days_after |> Ptime.add_span today |> of_ptime ~default:Ptime.max
+    day_span days_after |> Ptime.add_span today |> Option.value_exn
   in
   traverse path is_vcf |> List.map ~f:extract
   |> List.fold ~init:[] ~f:List.append (* flatten *)
