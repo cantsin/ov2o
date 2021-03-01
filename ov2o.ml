@@ -116,27 +116,18 @@ let discover path days_behind days_after =
   traverse path is_vcf |> List.map ~f:extract
   |> List.fold ~init:[] ~f:List.append (* flatten *)
   |> List.fold ~init:[] ~f:(fun accum event ->
-      let f = Icalendar.recur_events event in
-      let ongoing = ref true in
-      let addl = ref [] in
-      let () = while !ongoing do
-          match f () with
-          | None -> ongoing := false
-          | Some e ->
-            let () = Printf.printf "added recurrence %s\n" (e.uid |> snd) in
-            let () = Printf.printf "added ts %s\n" ([%show: Icalendar.timestamp_utc] (e.dtstamp |> snd)) in
-            addl := List.cons e !addl done in
-      List.cons event !addl |> List.append accum
+      let get_next_event = Icalendar.recur_events event in
+      let rec aux accum =
+        match get_next_event () with
+        | Some new_event when Ptime.is_earlier (get_start new_event) ~than:after ->
+          aux (List.cons new_event accum)
+        | _ -> accum in
+      let events = aux [event] in
+      List.append accum events
     )
   |> List.filter ~f:(fun event ->
-      let () = match event.rrule with
-        | None -> ()
-        | Some(_, r) -> Printf.printf "%s\n" ([%show: Icalendar.recurrence] r) in
-      true)
-  (* TODO apply recurrences *)
-  |> List.filter ~f:(fun event ->
-      let t = get_start event in
-      Ptime.is_later t ~than:behind && Ptime.is_earlier t ~than:after)
+      let start = get_start event in
+      Ptime.is_later start ~than:behind && Ptime.is_earlier start ~than:after)
   |> List.stable_sort ~compare:(fun event1 event2 ->
       Ptime.compare (get_start event1) (get_start event2))
   |> List.iter ~f:to_org
@@ -150,6 +141,3 @@ let command =
       fun () -> discover path days_behind days_after)
 
 let () = Command.run ~version:"1.0" command
-
-(* TODO: test duration *)
-(* TODO: install https://github.com/Khady/merlin-eldoc/*)
