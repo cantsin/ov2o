@@ -1,5 +1,5 @@
 {
-  description = "ov2o";
+  description = "ov2o: export calendars into org-mode";
 
   inputs = { nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable"; };
 
