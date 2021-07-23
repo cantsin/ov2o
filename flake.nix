@@ -1,19 +1,34 @@
 {
   description = "ov2o: export calendars into org-mode";
 
-  inputs = { nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable"; };
+  inputs = { nixpkgs.url = "github:nixos/nixpkgs/nixos-21.05"; };
 
   outputs = { self, nixpkgs }: {
-    packages.x86_64-linux.ov2o = let
+    defaultPackage.x86_64-linux = let
       pkgs = nixpkgs.legacyPackages.x86_64-linux;
-      ocaml = pkgs.ocaml-ng.ocamlPackages_4_10.ocaml;
-      opam2nix = import ./opam2nix.nix { };
-      selection = opam2nix.build {
-        inherit ocaml;
-        selection = ./opam-selection.nix;
-        src = ./.;
-      };
-    in selection.ov2o;
-    defaultPackage.x86_64-linux = self.packages.x86_64-linux.ov2o;
+      ocamlIcalendar = import ./icalendar.nix { inherit pkgs; };
+    in pkgs.stdenv.mkDerivation {
+      name = "ov2o";
+      src = self;
+
+      buildInputs = with pkgs.ocamlPackages; [
+        pkgs.dune_2
+        pkgs.ocaml
+        core
+        findlib
+        ocamlIcalendar
+        ppx_deriving
+        ppx_jane
+      ];
+
+      buildPhase = ''
+        dune build ov2o.exe
+      '';
+
+      installPhase = ''
+        mkdir -p $out/bin
+        cp _build/default/ov2o.exe $out/bin/ov2o
+      '';
+    };
   };
 }
