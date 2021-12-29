@@ -36,7 +36,8 @@ let get_datetime = function
           Time.Zone.find_exn z |> offset_tz |> Ptime.Span.of_int_s
         in
         Ptime.add_span t offset |> Option.value_exn
-      | `Utc u -> u
+      | `Utc u ->
+        Ptime.to_float_s u +. local_tz_offset |> Ptime.of_float_s |> Option.value_exn
       | `Local l -> l)
 
 let get_start (event : Icalendar.event) : Ptime.t =
