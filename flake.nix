@@ -14,6 +14,9 @@
       buildInputs = with pkgs.ocamlPackages; [
         pkgs.dune_2
         pkgs.ocaml
+        pkgs.ocamlformat
+        ocp-indent
+        ocaml-lsp
         core
         findlib
         ocamlIcalendar
