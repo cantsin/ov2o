@@ -33,7 +33,9 @@ let get_datetime = function
       match ts with
       | `With_tzid (t, (_, z)) ->
         let offset =
-          Time.Zone.find_exn z |> offset_tz |> Ptime.Span.of_int_s
+          (* hack *)
+          let tz = if equal_string z "Pacific Standard Time" then "America/Los_Angeles" else z in
+          Time.Zone.find_exn tz |> offset_tz |> Ptime.Span.of_int_s
         in
         Ptime.add_span t offset |> Option.value_exn
       | `Utc u ->
